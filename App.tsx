@@ -57,6 +57,28 @@ export default function App() {
     date: 'Сегодня, 21:00'
   });
 
+  // Функция расчета итоговой цены с учетом услуг
+  const calculateTotalPrice = (basePrice: number, services: string[], duration: string): number => {
+    let price = basePrice;
+    
+    // Множитель за длительность
+    if (duration.includes('2 часа')) {
+      price = basePrice * 2;
+    } else if (duration.includes('Ночь')) {
+      price = basePrice * 5;
+    }
+    
+    // Добавляем стоимость за дополнительные услуги
+    // Первые 3 услуги бесплатны (базовые), далее +5% за каждую
+    const extraServices = Math.max(0, services.length - 3);
+    if (extraServices > 0) {
+      const serviceMultiplier = 1 + (extraServices * 0.05); // +5% за каждую доп услугу
+      price = Math.round(price * serviceMultiplier);
+    }
+    
+    return price;
+  };
+
   // Load profiles and settings from Supabase
   useEffect(() => {
     async function fetchData() {
@@ -180,7 +202,11 @@ export default function App() {
         client_id: user.id,
         services: bookingData.serviceTypes,
         duration: bookingData.duration,
-        total_price: selectedProfile.price,
+        total_price: calculateTotalPrice(
+          selectedProfile.price, 
+          bookingData.serviceTypes, 
+          bookingData.duration
+        ),
         booking_date: bookingData.date,
         referrer_name: referrerInfo.name || undefined,
         referrer_telegram_id: referrerInfo.telegram_id || undefined
@@ -641,6 +667,16 @@ export default function App() {
                 </button>
               </div>
             </div>
+            
+            {/* Подсказка о ценообразовании */}
+            {bookingData.serviceTypes.length > 3 && (
+              <div className="mb-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-xs text-blue-400">
+                  💡 Первые 3 услуги включены в базовую цену. Каждая дополнительная +5%
+                </p>
+              </div>
+            )}
+            
             <div className="space-y-3">
               {selectedProfile.services.map(s => {
                 const isSelected = bookingData.serviceTypes.includes(s);
@@ -704,12 +740,18 @@ export default function App() {
           <div className="flex items-center justify-between mb-4 px-1">
             <span className="text-gray-400">Итого:</span>
             <span className="text-xl font-bold text-white">
-               {/* Simple calculation for demo */}
-               {bookingData.duration.includes('Ночь') ? (selectedProfile.price * 5).toLocaleString() : 
-                bookingData.duration.includes('2 часа') ? (selectedProfile.price * 2).toLocaleString() : 
-                selectedProfile.price.toLocaleString()} ₽
+               {calculateTotalPrice(
+                 selectedProfile.price, 
+                 bookingData.serviceTypes, 
+                 bookingData.duration
+               ).toLocaleString()} ₽
             </span>
           </div>
+          {bookingData.serviceTypes.length > 3 && (
+            <div className="text-xs text-gray-500 mb-3 px-1">
+              Базовая цена + {bookingData.serviceTypes.length - 3} доп. {bookingData.serviceTypes.length - 3 === 1 ? 'услуга' : 'услуги'} (+{(bookingData.serviceTypes.length - 3) * 5}%)
+            </div>
+          )}
           <button 
             onClick={handleBookingSubmit}
             className="w-full bg-white text-black font-bold py-4 rounded-xl text-lg hover:bg-gray-200 transition-colors shadow-lg"
@@ -751,8 +793,17 @@ export default function App() {
             <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-gold-500/10 rounded-full blur-2xl" />
             <p className="text-gray-400 text-sm mb-1 relative z-10">Сумма к оплате</p>
             <p className="text-4xl font-bold text-gold-500 mb-4 tracking-tight relative z-10">
-              {(selectedProfile ? selectedProfile.price : 0).toLocaleString()} ₽
+              {(selectedProfile ? calculateTotalPrice(
+                selectedProfile.price, 
+                bookingData.serviceTypes, 
+                bookingData.duration
+              ) : 0).toLocaleString()} ₽
             </p>
+            {bookingData.serviceTypes.length > 3 && (
+              <p className="text-xs text-gray-400 mb-3 relative z-10">
+                включая {bookingData.serviceTypes.length - 3} доп. {bookingData.serviceTypes.length - 3 === 1 ? 'услугу' : 'услуги'}
+              </p>
+            )}
             <div className="inline-flex items-center bg-dark-900/80 border border-dark-600 px-3 py-1.5 rounded-lg">
               <span className="text-[10px] text-gray-400 uppercase tracking-widest mr-2">Заказ</span>
               <span className="text-xs font-mono text-white">#{Math.floor(Math.random() * 90000) + 10000}</span>
